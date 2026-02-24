@@ -1,0 +1,67 @@
+{
+  "scene": "lake",
+  "images": {
+    "img1": "lake1.jpg",
+    "img2": "lake2.jpg"
+  },
+  "params": {
+    "harris": {
+      "block_size": 2,
+      "ksize": 3,
+      "k": 0.04
+    },
+    "descriptor": {
+      "patch_size": 40,
+      "desc_size": 8,
+      "blur_sigma": 1.0
+    },
+    "nms": {
+      "step1_window": 3,
+      "step1_threshold_rel": 0.02,
+      "nms_divisor": 20.0,
+      "nms_min_window": 15,
+      "nms_max_window": 201,
+      "nms_threshold_rel": 0.0005,
+      "nms_window_img1": 151,
+      "nms_window_img2": 151
+    },
+    "matching": {
+      "nndr_threshold": 0.85,
+      "mutual_nn": true,
+      "l2_normalize": true
+    },
+    "stitching": {
+      "enabled": true,
+      "panorama_height": 800,
+      "nndr_threshold": 0.97,
+      "mutual_nn": true,
+      "ransac_reproj_threshold_px": 3.0,
+      "max_iters": 4000,
+      "nms_divisor": 33.0,
+      "nms_threshold_rel": 0.0005,
+      "max_corners": 800,
+      "descriptor_blur_sigma": 2.0,
+      "inliers": 27,
+      "total_matches": 117,
+      "nms_window_img1": 93,
+      "nms_window_img2": 93,
+      "corners_img1": 691,
+      "corners_img2": 670
+    }
+  },
+  "counts": {
+    "step1_corners": {
+      "img1": 4523,
+      "img2": 13131
+    },
+    "nms_corners": {
+      "img1": 312,
+      "img2": 299
+    },
+    "descriptors": {
+      "img1": 312,
+      "img2": 299
+    },
+    "matches": 18
+  }
+}

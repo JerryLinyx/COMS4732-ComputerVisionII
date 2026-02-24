@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+Author: Yuxuan Lin (yl6061@columbia.edu), assisted by GPT-5.2
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>COMS4732 HW2 - Automatic Feature Matching</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 24px; color: #111; }
+    h1 { margin: 0 0 8px; }
+    .scene { margin: 28px 0 42px; padding: 18px 18px 8px; border: 1px solid #e5e7eb; border-radius: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .scroll-x { overflow-x: auto; padding-bottom: 6px; }
+    img.pano { height: 520px; width: auto; max-width: none; }
+    .meta { font-size: 14px; color: #374151; }
+    .tech { font-size: 14px; color: #111827; line-height: 1.35; margin: 12px 0 8px; }
+    .tech ul { margin: 8px 0 0; padding-left: 18px; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>HW2: Automatic Feature Matching Across Images</h1>
+  <div class="meta">
+    Author: <code>Yuxuan Lin (yl6061@columbia.edu)</code>, assisted by <code>GPT-5.2</code>
+  </div>
+  <div class="tech">
+    <div><b>Step choices</b></div>
+    <ul>
+      <li><b>Step 1 (Harris):</b> OpenCV <code>cornerHarris</code> with <code>block_size=2</code>, <code>ksize=3</code>, <code>k=0.04</code>. Visualization corners are 3x3 local maxima above a relative threshold.</li>
+      <li><b>Step 2 (NMS):</b> Local-maximum suppression in a square window sized by image scale; window sizes are reported per image.</li>
+      <li><b>Step 3 (Descriptor):</b> 40x40 grayscale patch, Gaussian blur (anti-alias), downsample to 8x8, bias/gain normalize (mean 0, std 1).</li>
+      <li><b>Step 4 (Matching):</b> SSD (L2) on descriptors with optional L2-normalization, NNDR thresholding, plus mutual nearest-neighbor filtering.</li>
+      <li><b>Extra credit:</b> Use a looser matching config for RANSAC homography, then warp + feather blend. Simple overlap-based color gain/bias correction is applied before blending.</li>
+    </ul>
+  </div>
+
+<div class="scene">
+  <h2>Scene: joshua</h2>
+  <div class="meta">Photos taken by me at Joshua Tree National Park.</div>
+  <div class="meta">Images: <code>joshua1.jpg</code> + <code>joshua2.jpg</code> · NMS window: img1=151px, img2=151px · NNDR threshold=0.85 · Matches=47</div>
+  <div class="meta">
+    Params: Harris(block=2, ksize=3, k=0.04) · Descriptor(patch=40->desc=8, blur_sigma=1.0) · Step1(3x3, thr_rel=0.02) · NMS(thr_rel=0.0005, divisor=20.0) · Matching(metric=SSD, mutual=True, l2_norm=True)
+  </div>
+  <div class="grid">
+    <div><div class="meta">Original pair</div><img src="assets/joshua/01_original.png" /></div>
+    <div><div class="meta">Step 1: Harris corners</div><img src="assets/joshua/02_step1_harris.png" /></div>
+    <div><div class="meta">Step 2: NMS corners</div><img src="assets/joshua/03_step2_nms.png" /></div>
+    <div><div class="meta">Step 4.2: NNDR histogram</div><img src="assets/joshua/04_nndr_hist.png" /></div>
+    <div><div class="meta">Step 4.1: Top-5 matches (img1 / img2 1NN / img2 2NN)</div><img src="assets/joshua/05_top5_descriptors.png" /></div>
+    <div><div class="meta">Step 4.3: Match visualization (green lines = matches, red dots = unmatched)</div><img src="assets/joshua/06_matches.png" /></div>
+    <div><div class="meta">Extra credit: panorama (scroll horizontally if needed)</div><div class="scroll-x"><img class="pano" src="assets/joshua/07_panorama.png" /></div></div>
+    <div><div class="meta">Extra credit: RANSAC inlier matches</div><img src="assets/joshua/07_inliers.png" /></div>
+  </div>
+</div>
+<div class="scene">
+  <h2>Scene: lake</h2>
+  <div class="meta">Photos taken by me at Lake Powell at Page.</div>
+  <div class="meta">Images: <code>lake1.jpg</code> + <code>lake2.jpg</code> · NMS window: img1=151px, img2=151px · NNDR threshold=0.85 · Matches=18</div>
+  <div class="meta">
+    Params: Harris(block=2, ksize=3, k=0.04) · Descriptor(patch=40->desc=8, blur_sigma=1.0) · Step1(3x3, thr_rel=0.02) · NMS(thr_rel=0.0005, divisor=20.0) · Matching(metric=SSD, mutual=True, l2_norm=True)
+  </div>
+  <div class="grid">
+    <div><div class="meta">Original pair</div><img src="assets/lake/01_original.png" /></div>
+    <div><div class="meta">Step 1: Harris corners</div><img src="assets/lake/02_step1_harris.png" /></div>
+    <div><div class="meta">Step 2: NMS corners</div><img src="assets/lake/03_step2_nms.png" /></div>
+    <div><div class="meta">Step 4.2: NNDR histogram</div><img src="assets/lake/04_nndr_hist.png" /></div>
+    <div><div class="meta">Step 4.1: Top-5 matches (img1 / img2 1NN / img2 2NN)</div><img src="assets/lake/05_top5_descriptors.png" /></div>
+    <div><div class="meta">Step 4.3: Match visualization (green lines = matches, red dots = unmatched)</div><img src="assets/lake/06_matches.png" /></div>
+    <div><div class="meta">Extra credit: panorama (scroll horizontally if needed)</div><div class="scroll-x"><img class="pano" src="assets/lake/07_panorama.png" /></div></div>
+    <div><div class="meta">Extra credit: RANSAC inlier matches</div><img src="assets/lake/07_inliers.png" /></div>
+  </div>
+</div>
+</body></html>
