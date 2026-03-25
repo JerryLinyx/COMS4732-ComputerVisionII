@@ -45,6 +45,9 @@ try:
 except ImportError:
     visualize_scene = None
 
+CODE_DIR = os.path.dirname(os.path.abspath(__file__))
+HW3_DIR = os.path.dirname(CODE_DIR)
+
 
 def seed_everything(seed: int):
     """Seed all random number generators for reproducibility."""
@@ -62,21 +65,24 @@ def seed_everything(seed: int):
 class Config:
     """Configuration for the two-view stereo reconstruction pipeline."""
     # Image paths
-    img1_path: str = None # TODO: provide
-    img2_path: str = None # TODO: provide
+    img1_path: str = os.path.join(HW3_DIR, "images", "img1_1280x960.jpeg")
+    img2_path: str = os.path.join(HW3_DIR, "images", "img2_1280x960.jpeg")
     output_dir_path: str = "outputs"
 
-    random_seed: int = None # TODO: provide
+    random_seed: int = 2026
 
     # Step 1 camera params
     # (iPhone 15 Pro 1x, 35mm-derived sensor dims for square pixels)
     optical_focal_length_mm: float = 6.765
     sensor_width_mm: float = 9.757
     sensor_height_mm: float = 7.318
+    # Optional override for focal length in pixels. If set, Step 1 will build K
+    # directly from this value and image center, bypassing mm-based conversion.
+    override_focal_length_px: float | None = None
 
     # Step 2 SIFT parameters
     sift_edge_discard: int = 20
-    sift_max_features: int = None # TODO: provide num SIFT features used
+    sift_max_features: int = 12000
     # Note: you shouldn't need to touch these sift params below. If you do, report what you changed.
     sift_contrast_threshold: float = 0.04  # Contrast threshold (lower = more features, but less stable)
     sift_edge_threshold: float = 10  # Edge threshold (higher = more features, including edges)
@@ -84,12 +90,12 @@ class Config:
     sift_sigma: float = 1.6  # Initial Gaussian sigma for image smoothing
 
     # Step 3 Feature matching
-    feature_matching_ratio_threshold: float = None # TODO: provide NNDR ratio
+    feature_matching_ratio_threshold: float = 0.94
 
     # Step 4 RANSAC
     ransac_s: int = 8  # Minimum 8 points for essential matrix
-    ransac_epsilon = None # TODO: provide distance threshold
-    ransac_num_iters: int = None # TODO: provide number of ransac iterations
+    ransac_epsilon: float = 2e-4
+    ransac_num_iters: int = 5000
 
     # Step 5 Triangulation filtering
     # Note: you shouldn't need to touch these triangulation params below. If you do, report what you changed.
@@ -158,13 +164,22 @@ def main(cfg: Config):
     # ========================================
     print(f"\n[1/5] Loading camera intrinsics")
     img_height_px, img_width_px = img1.shape[:2]
-    K = compute_K(
-        img_width_px=img_width_px,
-        img_height_px=img_height_px,
-        optical_focal_length_mm=cfg.optical_focal_length_mm,
-        sensor_width_mm=cfg.sensor_width_mm,
-        sensor_height_mm=cfg.sensor_height_mm,
-    )
+    if cfg.override_focal_length_px is not None:
+        f_px = float(cfg.override_focal_length_px)
+        K = np.array([
+            [f_px, 0.0, img_width_px / 2.0],
+            [0.0, f_px, img_height_px / 2.0],
+            [0.0, 0.0, 1.0],
+        ], dtype=np.float64)
+        print(f"      Using override focal length in pixels: f_px={f_px:.2f}")
+    else:
+        K = compute_K(
+            img_width_px=img_width_px,
+            img_height_px=img_height_px,
+            optical_focal_length_mm=cfg.optical_focal_length_mm,
+            sensor_width_mm=cfg.sensor_width_mm,
+            sensor_height_mm=cfg.sensor_height_mm,
+        )
     print(f"      Camera intrinsic matrix K:")
     for row in K:
         print(f"      [{row[0]:8.2f}  {row[1]:8.2f}  {row[2]:8.2f}]")

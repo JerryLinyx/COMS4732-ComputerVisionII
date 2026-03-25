@@ -23,5 +23,14 @@ def compute_K(
     Returns:
         K: (3, 3) camera intrinsic matrix [[f_px, 0, cx], [0, f_px, cy], [0, 0, 1]]
     """
-    # TODO
-    return None
+    # HW spec: f_px = f_mm * (W_px / w_mm)
+    f_px = optical_focal_length_mm * (img_width_px / sensor_width_mm)
+
+    cx = img_width_px / 2.0
+    cy = img_height_px / 2.0
+
+    return np.array([
+        [f_px, 0.0, cx],
+        [0.0, f_px, cy],
+        [0.0, 0.0, 1.0],
+    ], dtype=float)

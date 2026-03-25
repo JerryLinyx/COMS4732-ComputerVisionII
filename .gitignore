@@ -23,3 +23,7 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+
+tmp/
+submit/
+*.zip

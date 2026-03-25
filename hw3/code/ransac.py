@@ -99,7 +99,7 @@ def RANSAC(
         output_dir: directory for convergence plot (None to skip)
 
     Returns:
-        (R, t, inliers_mask, E) or all-None tuple on failure
+        (R, t, inliers_mask, E, points_3d) or all-None tuple on failure
     """
     print(f"\nPerforming RANSAC for Pose Estimation (Essential Matrix)")
     print(f"Using {s} point correspondences per iteration")
@@ -114,6 +114,9 @@ def RANSAC(
     best_num_inliers = 0
     best_E = None
     best_inliers_mask = None
+    best_R = None
+    best_t = None
+    best_points_3d = None
 
     # Convergence tracking
     inlier_counts, best_so_far = [], []
@@ -138,7 +141,41 @@ def RANSAC(
             # Don't forget to append to inlier_counts and best_so_far
             # each iteration (needed for the convergence plot).
             # ============================================================
-            return # fix me plz
+            sample_E = compute_E(img1_pts[idx], img2_pts[idx], K)
+
+            sample_R, sample_t, sample_points_3d = recover_pose(
+                sample_E, img1_pts[idx], img2_pts[idx], K
+            )
+            if sample_R is None:
+                inlier_counts.append(0)
+                best_so_far.append(best_num_inliers)
+                continue
+
+            distances = sampson_distance(sample_E, img1_pts, img2_pts, K_inv)
+            inliers_mask = distances < epsilon
+            num_inliers = int(np.sum(inliers_mask))
+
+            inlier_counts.append(num_inliers)
+
+            if num_inliers > best_num_inliers:
+                best_num_inliers = num_inliers
+                best_E = sample_E
+                best_inliers_mask = inliers_mask
+
+                # Recover pose using all inliers for this E (more stable than
+                # using only the random 8-point sample).
+                inlier_R, inlier_t, inlier_points_3d = recover_pose(
+                    sample_E, img1_pts[inliers_mask], img2_pts[inliers_mask], K
+                )
+                if inlier_R is None:
+                    best_R, best_t, best_points_3d = sample_R, sample_t, sample_points_3d
+                else:
+                    best_R, best_t, best_points_3d = inlier_R, inlier_t, inlier_points_3d
+
+                improvement_iters.append(it)
+                improvement_vals.append(best_num_inliers)
+
+            best_so_far.append(best_num_inliers)
             # ============================================================
 
         except (np.linalg.LinAlgError, AssertionError):
@@ -148,7 +185,7 @@ def RANSAC(
 
     if best_E is None:
         print("WARNING: RANSAC failed to find a valid pose!")
-        return None, None, None, None
+        return None, None, None, None, None
 
     # Post-loop refinement: re-estimate E from all inliers (not just
     # the 8-point sample), then recover the final (R, t).
@@ -159,15 +196,37 @@ def RANSAC(
         # YOUR CODE HERE: Re-estimate E from the inlier set,
         # then recover the final (R, t) via recover_pose()
         # ============================================================
-        return # fix me plz
+        try:
+            refined_E = compute_E(
+                img1_pts[best_inliers_mask],
+                img2_pts[best_inliers_mask],
+                K,
+            )
+            refined_distances = sampson_distance(refined_E, img1_pts, img2_pts, K_inv)
+            refined_mask = refined_distances < epsilon
+            refined_count = int(np.sum(refined_mask))
+
+            if refined_count >= 8 and refined_count > best_num_inliers:
+                refined_R, refined_t, refined_points_3d = recover_pose(
+                    refined_E, img1_pts[refined_mask], img2_pts[refined_mask], K
+                )
+                if refined_R is not None:
+                    best_E = refined_E
+                    best_inliers_mask = refined_mask
+                    best_num_inliers = refined_count
+                    best_R = refined_R
+                    best_t = refined_t
+                    best_points_3d = refined_points_3d
+        except (np.linalg.LinAlgError, AssertionError):
+            pass
         # ============================================================
     else:
         print("WARNING: Not enough inliers for post-loop refinement!")
-        return None, None, None, None
+        return None, None, None, None, None
 
     if best_R is None:
         print("WARNING: Post-loop pose recovery failed!")
-        return None, None, None, None
+        return None, None, None, None, None
 
     print(f"Found {best_num_inliers} inliers / {len(img1_pts)} correspondences "
           f"(pre-refinement: {pre_count})")
@@ -195,4 +254,4 @@ def RANSAC(
                                 improvement_iters, improvement_vals,
                                 best_num_inliers, epsilon, output_dir)
 
-    return best_R, best_t, best_inliers_mask, best_E
+    return best_R, best_t, best_inliers_mask, best_E, best_points_3d

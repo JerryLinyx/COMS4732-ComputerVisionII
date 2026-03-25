@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COMS4732 HW3 - Simple Structure from Motion</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.45;
+      margin: 24px auto;
+      max-width: 1100px;
+      padding: 0 16px;
+      color: #222;
+    }
+    h1, h2 { margin-top: 1.2em; }
+    .meta { background: #f5f7fa; padding: 12px 16px; border-radius: 8px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .triptych {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    @media (min-width: 900px) {
+      .triptych { grid-template-columns: repeat(3, 1fr); }
+    }
+    figure {
+      margin: 0;
+      background: #fafafa;
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    figcaption {
+      margin-top: 8px;
+      font-size: 0.95rem;
+      color: #333;
+    }
+    img { width: 100%; border: 1px solid #ddd; border-radius: 6px; }
+    code, pre { background: #f5f5f5; border-radius: 4px; }
+    pre { padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>COMS4732 HW3: Simple Structure from Motion</h1>
+  <div class="meta">
+    <p><strong>Author:</strong> Yuxuan Lin (yl6061@columbia.edu), assisted by GPT</p>
+    <p><strong>Scene:</strong> staff-provided <code>img1_1280x960.jpeg</code> + <code>img2_1280x960.jpeg</code></p>
+    <p><strong>Code:</strong> <code>hw3/code/</code></p>
+  </div>
+
+  <h2>Parameters</h2>
+  <ul>
+    <li>Random seed: <code>2026</code></li>
+    <li>SIFT max features: <code>12000</code></li>
+    <li>NNDR threshold: <code>0.94</code></li>
+    <li>RANSAC sample size: <code>8</code></li>
+    <li>RANSAC epsilon: <code>2e-4</code></li>
+    <li>RANSAC iterations: <code>5000</code></li>
+  </ul>
+
+  <h2>Step 1: Camera Intrinsics</h2>
+  <p>Formula used (per HW spec): <code>f_px = f_mm * (W_px / w_mm)</code>, with <code>c_x = W_px / 2</code>, <code>c_y = H_px / 2</code>.</p>
+  <p>Implementation location: <code>hw3/code/intrinsics.py</code> (<code>compute_K</code>).</p>
+  <pre>K =
+[887.49,   0.00, 640.00]
+[  0.00, 887.49, 480.00]
+[  0.00,   0.00,   1.00]</pre>
+
+  <h2>Step 2: SIFT Features</h2>
+  <p>Detected SIFT keypoints: image1 = <strong>8039</strong>, image2 = <strong>7362</strong>.</p>
+  <div class="grid">
+    <img src="assets/step2_sift_keypoints.png" alt="SIFT keypoints">
+  </div>
+
+  <h2>Step 3: Feature Matching (NNDR)</h2>
+  <p>Correspondences before RANSAC: <strong>2043</strong>.</p>
+  <div class="grid">
+    <img src="assets/step3_feature_matching_nndr_histogram.png" alt="NNDR histogram">
+    <img src="assets/step3_feature_matching_top5_nndr.png" alt="Top 5 NNDR matches">
+    <img src="assets/step3_correspondences_before_ransac.png" alt="Correspondences before RANSAC">
+  </div>
+
+  <h2>Step 4: RANSAC for Essential Matrix</h2>
+  <p>Inliers after RANSAC: <strong>417 / 2043 (20.41%)</strong>.</p>
+  <div class="grid">
+    <img src="assets/step4_ransac_convergence.png" alt="RANSAC convergence">
+    <img src="assets/step4_correspondences_after_ransac.png" alt="Correspondences after RANSAC">
+    <img src="assets/step4_epipolar_lines.png" alt="Epipolar lines">
+  </div>
+
+  <h2>Step 5: Sparse 3D Reconstruction</h2>
+  <p>Valid triangulated 3D points: <strong>417</strong>.</p>
+  <div class="grid">
+    <img src="assets/step5_pipeline_grid.png" alt="Pipeline summary">
+    <img src="assets/step5_camera_poses.png" alt="Camera poses and point cloud">
+  </div>
+
+  <h2>Viser Screenshots (Manual)</h2>
+  <p>Launch command:</p>
+  <pre>cd hw3/code
+conda run -n cv python visualize_viser.py ../web/assets/step5_scene_data.npz</pre>
+  <div class="triptych">
+    <figure>
+      <img src="assets/screenshot1.png" alt="Viser screenshot view 1">
+      <figcaption>
+        View 1: two camera visible, and point cluster in front matches the poster and coffee table in the original scene.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshot2.png" alt="Viser screenshot view 2">
+      <figcaption>
+        View 2: front-facing view shows camera 2 shifted up-right relative to camera 1.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshot3.png" alt="Viser screenshot view 3">
+      <figcaption>
+        View 3: side view emphasizes depth layering; the poster looks planar from this angle, as expected.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Pose Summary</h2>
+  <ul>
+    <li>Roll/Pitch/Yaw: <code>20.91 / 26.27 / 9.39</code> degrees</li>
+    <li>Translation direction: <code>[-0.7314, 0.5243, 0.4361]</code></li>
+    <li>Baseline (scale-ambiguous): <code>1.0000</code></li>
+  </ul>
+
+  <h2>Extra Credit: Capture Your Own Scene</h2>
+  <div class="meta">
+    <p><strong>Scene:</strong> McLaren Artura at Wynn Las Vegas (shot on 2026-01-02)</p>
+    <p><strong>Images:</strong> <code>IMG_6206.jpg</code> (img1), <code>IMG_6207.jpg</code> (img2), both from same iPhone 16 Pro lens mode, no crop/zoom.</p>
+    <p><strong>Camera Params (iPhone 16 Pro):</strong> 24mm-equivalent, f/1.78, ISO 125, 1/120s, 24MP (<code>5712x4284</code>).</p>
+  </div>
+
+  <h3>Extra Credit Parameters</h3>
+  <ul>
+    <li>Random seed: <code>2026</code></li>
+    <li>SIFT max features: <code>12000</code></li>
+    <li>NNDR threshold: <code>0.92</code></li>
+    <li>RANSAC epsilon: <code>1e-4</code></li>
+    <li>RANSAC iterations: <code>5000</code></li>
+    <li>Camera intrinsics method: pixel-focal override using 24mm-equivalent assumption</li>
+  </ul>
+  <pre>Extra-credit K (approx):
+[3960.56,    0.00, 2142.00]
+[   0.00, 3960.56, 2856.00]
+[   0.00,    0.00,    1.00]</pre>
+  <p>Note: Because EXIF focal metadata was unavailable in these files, <code>f_px</code> was estimated from 24mm-equivalent focal length using image diagonal conversion.</p>
+
+  <h3>Extra Credit Results</h3>
+  <ul>
+    <li>SIFT keypoints: image1 <code>11780</code>, image2 <code>11944</code></li>
+    <li>Correspondences before RANSAC: <code>2521</code></li>
+    <li>Inliers after RANSAC: <code>371 / 2521 (14.7%)</code></li>
+    <li>Valid triangulated 3D points: <code>363</code></li>
+    <li>Mean reprojection error (valid points): <code>8.60 px</code></li>
+    <li>Pose (roll/pitch/yaw): <code>10.13 / 31.19 / 14.89</code> deg</li>
+    <li>Translation direction: <code>[-0.9674, -0.1659, 0.1914]</code></li>
+  </ul>
+
+  <h3>Extra Credit Visualizations</h3>
+  <div class="grid">
+    <img src="assets/extra_step0_original_images.png" alt="Extra scene original images">
+    <img src="assets/extra_step2_sift_keypoints.png" alt="Extra scene SIFT keypoints">
+    <img src="assets/extra_step3_feature_matching_nndr_histogram.png" alt="Extra scene NNDR histogram">
+    <img src="assets/extra_step3_feature_matching_top5_nndr.png" alt="Extra scene top 5 NNDR matches">
+    <img src="assets/extra_step3_correspondences_before_ransac.png" alt="Extra scene correspondences before RANSAC">
+    <img src="assets/extra_step4_ransac_convergence.png" alt="Extra scene RANSAC convergence">
+    <img src="assets/extra_step4_correspondences_after_ransac.png" alt="Extra scene correspondences after RANSAC">
+    <img src="assets/extra_step4_epipolar_lines.png" alt="Extra scene epipolar lines">
+    <img src="assets/extra_step5_camera_poses.png" alt="Extra scene camera poses">
+    <img src="assets/extra_step5_pipeline_grid.png" alt="Extra scene pipeline grid">
+  </div>
+
+  <h3>Extra Credit Viser Screenshots</h3>
+  <div class="triptych">
+    <figure>
+      <img src="assets/extra_screenshot1.png" alt="Extra credit viser screenshot 1">
+      <figcaption>
+        View 1: both camera visible; the front dense cluster aligns with the McLaren Artura body, while upper sparse points align with wall details (Lando Norris poster).
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/extra_screenshot2.png" alt="Extra credit viser screenshot 2">
+      <figcaption>
+        View 2: camera 2 appears shifted to the right of camera 1, consistent with the two captures.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/extra_screenshot3.png" alt="Extra credit viser screenshot 3">
+      <figcaption>
+        View 3: side/top-oblique view highlights depth layering; the elongated strip points correspond to the Artura, and upper points are consistent with the poster region.
+      </figcaption>
+    </figure>
+  </div>
+</body>
+</html>
