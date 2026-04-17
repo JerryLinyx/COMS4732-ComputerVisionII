@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COMS4732 HW4 - Neural Fields and NeRF</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 24px auto;
+      max-width: 1120px;
+      padding: 0 16px 48px;
+      color: #222;
+    }
+    h1, h2, h3 { margin-top: 1.2em; }
+    .meta {
+      background: #f5f7fa;
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .triptych {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 900px) {
+      .triptych { grid-template-columns: repeat(3, 1fr); }
+    }
+    figure {
+      margin: 0;
+      background: #fafafa;
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    figcaption {
+      margin-top: 8px;
+      font-size: 0.95rem;
+      color: #333;
+    }
+    img {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+    code, pre {
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+    pre {
+      padding: 10px;
+      overflow-x: auto;
+    }
+    ul { padding-left: 22px; }
+  </style>
+</head>
+<body>
+  <h1>COMS4732 HW4: Neural Fields and Neural Radiance Fields</h1>
+  <div class="meta">
+    <p><strong>Author:</strong> Yuxuan Lin (yl6061@columbia.edu), assisted by GPT</p>
+    <p><strong>Code:</strong> <code>hw4/code/</code></p>
+  </div>
+
+  <h2>Overview</h2>
+  <p>
+    This homework has two completed parts in this report. Part 1 fits a 2D neural field to an image using positional encoding and a small MLP.
+    Part 2 fits a NeRF to the provided Lego multi-view dataset using sampled rays, sampled 3D points, a NeRF MLP, and volume rendering.
+  </p>
+
+  <h2>Part 1: Fit a Neural Field to a 2D Image</h2>
+  <p>
+    I implemented a positional-encoding-based MLP in <code>hw4/code/models.py</code> and the full training pipeline in
+    <code>hw4/code/train_part1.py</code>. The dataloader randomly samples normalized pixel coordinates and RGB targets,
+    the model predicts colors in <code>[0, 1]</code>, and optimization uses Adam with MSE loss while PSNR is tracked over training.
+  </p>
+
+  <h3>Model Architecture and Hyperparameters</h3>
+  <ul>
+    <li>Input: 2D normalized pixel coordinates <code>(u, v)</code></li>
+    <li>Positional encoding frequencies: default <code>L = 10</code></li>
+    <li>Network: <code>4</code> linear layers with hidden width <code>256</code>, ReLU activations, and final Sigmoid</li>
+    <li>Optimizer: Adam</li>
+    <li>Learning rate: <code>1e-2</code></li>
+    <li>Batch size: <code>10000</code></li>
+    <li>Training iterations: <code>2000</code></li>
+    <li>Hyperparameter comparison grid: PE frequencies <code>{2, 10}</code> and widths <code>{64, 256}</code></li>
+  </ul>
+
+  <h3>Provided Reference Image</h3>
+  <p>
+    The reference image run used the default Part 1 setup and reached a final reconstruction quality of
+    <strong>29.247 dB PSNR</strong>.
+  </p>
+  <div class="grid">
+    <figure>
+      <img src="assets/part1_ref_progression.png" alt="Part 1 reference image training progression">
+      <figcaption>
+        Training progression on the provided image using checkpoints from iterations
+        <code>1, 250, 500, 750, 1000, 1250, 1500, 1750, 2000</code>.
+        The neural field first captures low frequencies and then sharpens edges and texture.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_ref_final.png" alt="Part 1 reference image final render">
+      <figcaption>
+        Final reconstruction for the provided image after 2000 iterations.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_ref_hyperparameter_grid.png" alt="Part 1 reference image hyperparameter grid">
+      <figcaption>
+        Final results for two positional-encoding frequencies and two hidden widths. Lower PE and smaller width blur high-frequency image detail.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_ref_psnr_curve.png" alt="Part 1 reference image PSNR curve">
+      <figcaption>
+        PSNR curve for the provided image using
+        <code>L=10</code>, width <code>256</code>, <code>4</code> layers,
+        learning rate <code>1e-2</code>, batch size <code>10000</code>, and
+        <code>2000</code> training iterations. The metric rises quickly early and then improves more gradually as details are refined.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>Own Image: IMG_6873.jpg</h3>
+  <p>
+    My own image is <code>IMG_6873.jpg</code>. Since the original resolution is very large, I resized it to a maximum image dimension of
+    <code>512</code> inside the training script for a manageable MPS training budget. This run reached <strong>31.337 dB PSNR</strong>.
+  </p>
+  <div class="grid">
+    <figure>
+      <img src="assets/part1_own_progression.png" alt="Part 1 own image training progression">
+      <figcaption>
+        Training progression on my own image using checkpoints from iterations
+        <code>1, 250, 500, 750, 1000, 1250, 1500, 1750, 2000</code>.
+        Structure is recovered early, followed by finer boundaries and color transitions.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_own_final.png" alt="Part 1 own image final render">
+      <figcaption>
+        Final reconstruction for <code>IMG_6873.jpg</code>.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_own_hyperparameter_grid.png" alt="Part 1 own image hyperparameter grid">
+      <figcaption>
+        Hyperparameter grid on my own image. The larger model with higher-frequency positional encoding best preserves detail.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part1_own_psnr_curve.png" alt="Part 1 own image PSNR curve">
+      <figcaption>
+        PSNR curve for my own image run using
+        <code>L=10</code>, width <code>256</code>, <code>4</code> layers,
+        learning rate <code>1e-2</code>, batch size <code>10000</code>,
+        <code>2000</code> training iterations, and max image dimension <code>512</code>.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Part 2: Fit a Neural Radiance Field from Multi-view Images</h2>
+  <p>
+    I implemented the missing ray sampling pipeline in <code>hw4/code/dataset_3d.py</code>, point sampling along rays and rendering helpers in
+    <code>hw4/code/rendering.py</code>, and the NeRF model plus full training pipeline in <code>hw4/code/models.py</code> and
+    <code>hw4/code/train_nerf.py</code>.
+  </p>
+
+  <h3>Implementation Summary</h3>
+  <ul>
+    <li><strong>Part 2.1, create rays from cameras:</strong> I used the intrinsics matrix <code>K</code> and each camera-to-world matrix to convert every pixel center into a ray origin and a normalized ray direction.</li>
+    <li><strong>Part 2.2, sample points along rays:</strong> I uniformly sampled 3D points between <code>near = 2.0</code> and <code>far = 6.0</code> for each ray and added perturbation during training for stratified sampling.</li>
+    <li><strong>Part 2.3, put dataloading together:</strong> I implemented a fully working <code>RaysData</code> dataset that precomputes pixel coordinates, ray origins, ray directions, and ground-truth RGB values across all training images, then randomly samples rays from this flattened pool.</li>
+    <li><strong>Part 2.4, neural radiance field:</strong> I implemented an 8-layer NeRF MLP with hidden width <code>256</code>, positional encoding for both 3D points and viewing directions, and a skip connection at layer <code>4</code>.</li>
+    <li><strong>Part 2.5, volume rendering:</strong> I predicted per-sample color and density and composited them with the provided discrete volume rendering equation to obtain one RGB prediction per ray.</li>
+    <li><strong>Stability fix:</strong> I changed the density head from a plain ReLU output to <code>Softplus</code> with a small positive bias initialization to prevent the density branch from collapsing to zero during long MPS runs.</li>
+  </ul>
+
+  <h3>Best Training Configuration</h3>
+  <ul>
+    <li>Dataset: provided <code>lego_200x200.npz</code></li>
+    <li>Device: <code>mps</code></li>
+    <li>Training iterations: <code>2500</code></li>
+    <li>Rays per iteration: <code>4096</code></li>
+    <li>Samples per ray: <code>32</code></li>
+    <li>Learning rate: <code>5e-4</code></li>
+    <li>XYZ positional encoding frequencies: <code>10</code></li>
+    <li>Direction positional encoding frequencies: <code>4</code></li>
+    <li>Validation cadence: every <code>100</code> iterations on <code>6</code> validation views</li>
+    <li>Final validation PSNR: <strong>23.103 dB</strong></li>
+  </ul>
+
+  <h3>Rays and Samples Visualization</h3>
+  <div class="triptych">
+    <figure>
+      <img src="assets/part2_vis_overview.png" alt="Part 2 visualization overview">
+      <figcaption>
+        Overview view of the cameras, sampled rays, and sampled 3D points from a single training step. I used <code>100</code> rays to match the homework recommendation.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part2_vis_front.png" alt="Part 2 visualization front view">
+      <figcaption>
+        Closer front view of the sampled rays, sampled 3D points, and nearby camera previews.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part2_vis_oblique.png" alt="Part 2 visualization side view">
+      <figcaption>
+        Wider side view of the same sampled bundle, showing the ray fan together with a denser set of nearby camera previews at a different zoom scale.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>Training Progression and Validation PSNR</h3>
+  <div class="grid">
+    <figure>
+      <img src="assets/part2_progression.png" alt="Part 2 validation render progression">
+      <figcaption>
+        Validation render progression across training using checkpoints from iterations
+        <code>1, 500, 1000, 1500, 2500</code>. The scene starts nearly empty, then coarse geometry appears, and finally the Lego structure becomes visibly sharper.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part2_training_loss.png" alt="Part 2 training loss">
+      <figcaption>
+        Training loss over optimization.
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="assets/part2_validation_psnr.png" alt="Part 2 validation PSNR curve">
+      <figcaption>
+        Validation PSNR curve averaged over <code>6</code> validation images. The final model surpasses the 23 dB target mentioned on the homework page.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h3>Novel-view Rendering with Test Cameras</h3>
+  <div class="grid">
+    <figure>
+      <img src="assets/part2_lego_test_video.gif" alt="Part 2 Lego novel view video">
+      <figcaption>
+        Spherical rendering of the Lego scene using the provided test camera extrinsics.
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>Files and Commands</h2>
+  <p>The main files used for this report are:</p>
+  <ul>
+    <li><code>hw4/code/models.py</code></li>
+    <li><code>hw4/code/dataset_3d.py</code></li>
+    <li><code>hw4/code/rendering.py</code></li>
+    <li><code>hw4/code/train_part1.py</code></li>
+    <li><code>hw4/code/train_nerf.py</code></li>
+  </ul>
+  <p>Representative training commands:</p>
+  <pre>conda activate cv-mps-conda
+python hw4/code/train_part1.py --image-path hw4/images/part1.jpg --train-iters 2000 --batch-size 10000 --snapshot-every 250 --output-dir hw4/outputs/part1/part1_ref_mps --device auto
+python hw4/code/train_part1.py --image-path hw4/images/IMG_6873.jpg --max-image-dim 512 --train-iters 2000 --batch-size 10000 --snapshot-every 250 --output-dir hw4/outputs/part1/img6873_mps --device auto
+python hw4/code/train_nerf.py --train-iters 2500 --num-rays 4096 --num-samples-along-ray 32 --val-every 100 --chunk-size 4096 --render-test-video --output-dir hw4/outputs/part2/mps_2500_r4096_s32 --device auto --seed 42</pre>
+</body>
+</html>

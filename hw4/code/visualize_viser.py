@@ -4,19 +4,26 @@ import numpy as np
 import torch
 import tyro
 from dataclasses import dataclass
+from pathlib import Path
 
-from src.dataset_3d import load_data, RaysData
-from src.rendering import sample_along_rays
+from dataset_3d import load_data, RaysData
+from rendering import sample_along_rays
 
 
 @dataclass
 class Config:
-    data_path: str = "data/lego_200x200.npz"
-    near: float = None
-    far: float = None
-    num_samples_along_ray: int = None
-    num_rays: int = None
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+    data_path: str = str(Path(__file__).resolve().parents[1] / "lego_200x200.npz")
+    near: float = 2.0
+    far: float = 6.0
+    num_samples_along_ray: int = 32
+    num_rays: int = 100
+    device: str = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
     port: int = 8080
 
 

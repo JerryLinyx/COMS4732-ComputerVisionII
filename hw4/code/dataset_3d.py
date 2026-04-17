@@ -96,7 +96,7 @@ def pixels_to_rays(
         r_ds: torch.Tensor of shape (num_pixels, 3) representing the ray directions
     """
     K = K.to(device)
-    c2w = c2w.to(torch.float64).to(device)
+    c2w = c2w.to(torch.float32).to(device)
     uvs = uvs.to(device)
 
     if verbose:
@@ -115,8 +115,8 @@ def pixels_to_rays(
 
     # ray directions: R @ K_inv @ [u, v, 1] for each pixel, then normalize
     K_inv = torch.linalg.inv(K).to(device)
-    M = R @ K_inv.to(torch.float64)  # (3, 3) — combines rotation and unprojection
-    dirs = (M @ homog_uvs.to(torch.float64).T).T  # (num_pixels, 3)
+    M = R @ K_inv.to(torch.float32)  # (3, 3) — combines rotation and unprojection
+    dirs = (M @ homog_uvs.to(torch.float32).T).T  # (num_pixels, 3)
     r_ds = dirs / torch.linalg.norm(dirs, dim=1, keepdim=True)
 
     if verbose:
@@ -126,7 +126,7 @@ def pixels_to_rays(
         print(f"r_os shape: {r_os.shape}")
         print(f"r_ds shape: {r_ds.shape}")
 
-    return r_os, r_ds  # each is (num_pixels, 3)
+    return r_os.to(torch.float32), r_ds.to(torch.float32)  # each is (num_pixels, 3)
 
 
 def image_to_rays(
@@ -149,8 +149,15 @@ def image_to_rays(
         torch.Tensor of shape (H, W, 6) where [:, :, :3] are ray origins
         and [:, :, 3:] are ray directions
     """
-    # TODO implement yourself
-    pass
+    h, w = image.shape[:2]
+    xs = torch.arange(w, device=device, dtype=torch.float32) + 0.5
+    ys = torch.arange(h, device=device, dtype=torch.float32) + 0.5
+    grid_x, grid_y = torch.meshgrid(xs, ys, indexing="xy")
+    uvs = torch.stack((grid_x.reshape(-1), grid_y.reshape(-1)), dim=-1)
+
+    rays_o, rays_d = pixels_to_rays(K=K, c2w=c2w, uvs=uvs, verbose=verbose, device=device)
+    rays = torch.cat((rays_o, rays_d), dim=-1)
+    return rays.reshape(h, w, 6).to(torch.float32)
 
 
 def images_to_rays(
@@ -173,8 +180,11 @@ def images_to_rays(
         torch.Tensor of shape (num_images, H, W, 6) where [:, :, :, :3] are ray origins
         and [:, :, :, 3:] are ray directions
     """
-    # TODO implement yourself
-    pass
+    rays = [
+        image_to_rays(image=image, c2w=c2w, K=K, verbose=verbose, device=device)
+        for image, c2w in zip(images, c2ws)
+    ]
+    return torch.stack(rays, dim=0)
 
 
 class RaysData(Dataset):
@@ -223,9 +233,24 @@ class RaysData(Dataset):
         # This is used in visualize_viser.py to verify that rays match the correct pixels:
         #   assert images[0, uvs[:, 1], uvs[:, 0]] == dataset.pixels[:]
         # Hint: torch.meshgrid with torch.arange(W) and torch.arange(H)
+        xs = torch.arange(self.w, device=device, dtype=torch.long)
+        ys = torch.arange(self.h, device=device, dtype=torch.long)
+        grid_x, grid_y = torch.meshgrid(xs, ys, indexing="xy")
+        single_image_uvs = torch.stack((grid_x.reshape(-1), grid_y.reshape(-1)), dim=-1)
+        self.uvs = single_image_uvs.repeat(self.num_images, 1)
 
-        # TODO implement yourself
-        pass
+        rays = images_to_rays(
+            images=self.images,
+            c2ws=self.c2ws,
+            K=self.K,
+            verbose=False,
+            device=device,
+        )
+        rays = rays.reshape(-1, 6)
+
+        self.rays_o = rays[:, :3].to(torch.float32)
+        self.rays_d = rays[:, 3:].to(torch.float32)
+        self.gt_rgbs = self.images.reshape(-1, 3).to(torch.float32)
 
     def __len__(self):
         """Return the total number of rays in the dataset.
@@ -233,8 +258,7 @@ class RaysData(Dataset):
         Returns:
             int representing num_images * H * W
         """
-        # TODO implement yourself
-        pass
+        return self.num_images * self.h * self.w
 
     def sample_rays(self, num_rays: int):
         """Sample random rays from the dataset.
@@ -250,5 +274,5 @@ class RaysData(Dataset):
         Hints:
             You need to randomly sample the rays and pixels using num_rays
         """
-        # TODO implement yourself
-        return None, None, None
+        indices = torch.randint(0, len(self), (num_rays,), device=self.rays_o.device)
+        return self.rays_o[indices], self.rays_d[indices], self.gt_rgbs[indices]

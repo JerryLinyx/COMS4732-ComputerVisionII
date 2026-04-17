@@ -20,10 +20,24 @@ htmlcov/
 
 # OS
 .DS_Store
+.cache/
+.mplconfig/
+.mplconfig-doc/
 
 # Jupyter
 .ipynb_checkpoints/
 
 tmp/
 submit/
+outputs/
 *.zip
+
+# Local packaging / submission copies
+hw4_sub/
+
+# Local reference materials
+hw4/COMS4732 HW4 - Neural Fields and NeRF.pdf
+
+# Temporary visualization candidates
+hw4/web/assets/_cand_*.png
+hw4/web/assets/part2_vis_candidates.png
